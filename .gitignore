@@ -1,0 +1,11 @@
+基于ArcGIS制作排放清单/
+__pycache__/
+*.pyc
+*.pyo
+.idea/
+.vscode/
+*.nc
+*.log
+.DS_Store
+Thumbs.db
+data/inputs/*
