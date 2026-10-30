@@ -27,6 +27,7 @@ def load_ini():
         'end_time': '2020-01-31-23',
         'meic_year': '',
         'meic_month': '',
+        'inputtype': 'month',
         'sources': 'AG,IN,PP,AR,TR',
     }
     if INI_PATH.exists():
@@ -36,7 +37,7 @@ def load_ini():
                 if cp.has_option('PATHS', k):
                     defaults[k] = cp.get('PATHS', k).strip()
         if cp.has_section('RUN'):
-            for k in ['start_time', 'end_time', 'meic_year', 'meic_month', 'sources']:
+            for k in ['start_time', 'end_time', 'meic_year', 'meic_month', 'inputtype', 'sources']:
                 if cp.has_option('RUN', k):
                     defaults[k] = cp.get('RUN', k).strip()
     return defaults
@@ -78,6 +79,9 @@ INI 文件位置: config.ini
     parser.add_argument('--meic_month', type=int, default=None,
                         help='MEIC数据起始月份 (如 6，默认取start_time月份)')
     parser.add_argument('--sources', type=str, default=ini['sources'])
+    parser.add_argument('--inputtype', type=str, default=ini['inputtype'],
+                        choices=['month', 'year'],
+                        help='排放清单输入时间尺度: month(月总量) / year(年总量)')
     args = parser.parse_args()
 
     from datetime import datetime as _dt
@@ -112,6 +116,7 @@ INI 文件位置: config.ini
     print(f'  start_time={start_dt.strftime("%Y-%m-%d %H:00")}, '
           f'end_time={end_dt.strftime("%Y-%m-%d %H:00")}')
     print(f'  meic_year={meic_year}, meic_month={meic_month}, sources={sources}')
+    print(f'  inputtype={args.inputtype}')
     print()
 
     gridcro2d_path = args.gridcro2d if args.gridcro2d else None
@@ -132,6 +137,7 @@ INI 文件位置: config.ini
         meic_month=meic_month,
         sources=sources,
         gridcro2d_file=gridcro2d_path,
+        inputtype=args.inputtype,
     )
 
 

@@ -40,13 +40,22 @@ class SpeciationEngine:
                 order.append(sp)
         return order
 
+    def _row_unit(self, row):
+        unit = str(row.get('unit', '')).strip().lower()
+        if unit in ('g/s', 'moles/s', 'mol/s'):
+            return 'g/s' if unit == 'g/s' else 'moles/s'
+        pollutant = str(row['pollutant']).strip().upper()
+        if pollutant in ('PM25', 'PMC'):
+            return 'g/s'
+        return 'moles/s'
+
     def species_units(self, source):
         mapping = self.mappings.get(source)
-        if mapping is None or 'unit' not in mapping.columns:
+        if mapping is None:
             return None
         units = {}
         for _, row in mapping.iterrows():
-            units[str(row['species'])] = str(row['unit']).strip()
+            units[str(row['species'])] = self._row_unit(row)
         return units
 
     def speciate(self, emissions_df, source):
@@ -72,9 +81,17 @@ class SpeciationEngine:
             for _, row in subset.iterrows():
                 species = str(row['species'])
                 split = float(row['split_factor'])
+                divisor = float(row['divisor']) if 'divisor' in row.index else 1.0
+                if not np.isfinite(divisor) or divisor <= 0:
+                    divisor = 1.0
+
+                conv = split * 1e6
+                if self._row_unit(row) != 'g/s':
+                    conv = conv / divisor
+
                 result[species] = (
                     result[species].values
-                    + emissions_df[meic_col].fillna(0).values * split
+                    + emissions_df[meic_col].fillna(0).values * conv
                 )
 
         result = result.fillna(0)

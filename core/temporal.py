@@ -45,29 +45,23 @@ class TemporalProfile:
         month_idx_map = {int(idx[i]): i for i in range(len(idx))}
         return vals
 
-    def build_temporal_matrix(self, month_idx, source_key, n_days=None):
-        monthly_f = self.get_monthly_factors(source_key)
-        weekly_f = self.get_weekly_factors(source_key)
-        hourly_f = self.get_hourly_factors(source_key)
+    def build_temporal_matrix(self, month_idx, source_key, n_days=None, inputtype='month', year=None):
+        from datetime import datetime, timedelta
 
+        if year is None:
+            year = datetime.now().year
         if n_days is None:
             n_days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month_idx]
+            if month_idx == 1 and (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)):
+                n_days = 29
 
-        month_factor = monthly_f[month_idx] if month_idx < len(monthly_f) else 1.0
+        start_dt = datetime(year, month_idx + 1, 1, 0)
+        end_dt = start_dt + timedelta(hours=n_days * 24 - 1)
+        return self.build_temporal_matrix_range(
+            start_dt, end_dt, source_key, inputtype=inputtype
+        )
 
-        hourly_matrix = np.zeros((n_days, 24))
-        for d in range(n_days):
-            wd = d % 7
-            hour_factor = weekly_f[wd] * hourly_f
-            hourly_matrix[d, :] = month_factor * hour_factor
-
-        total = hourly_matrix.sum()
-        if total > 0:
-            hourly_matrix = hourly_matrix / total * 12.0
-
-        return hourly_matrix.flatten()
-
-    def build_temporal_matrix_range(self, start_dt, end_dt, source_key):
+    def build_temporal_matrix_range(self, start_dt, end_dt, source_key, inputtype='month'):
         from datetime import timedelta
 
         monthly_f = self.get_monthly_factors(source_key)
@@ -76,19 +70,22 @@ class TemporalProfile:
 
         n_hours = int((end_dt - start_dt).total_seconds() / 3600) + 1
         factors = np.zeros(n_hours, dtype=np.float64)
+        month_idx = np.zeros(n_hours, dtype=np.int32)
 
         for h in range(n_hours):
             cur = start_dt + timedelta(hours=h)
-            m_idx = cur.month - 1
-            w_idx = cur.weekday()
-            hr_idx = cur.hour
+            month_idx[h] = cur.month - 1
+            factors[h] = weekly_f[cur.weekday()] * hourly_f[cur.hour]
 
-            month_factor = monthly_f[m_idx] if m_idx < len(monthly_f) else 1.0
-            factors[h] = month_factor * weekly_f[w_idx] * hourly_f[hr_idx]
-
-        total = factors.sum()
-        if total > 0:
-            n_months_span = (end_dt.year - start_dt.year) * 12 + end_dt.month - start_dt.month + 1
-            factors = factors / total * (12.0 if n_months_span <= 1 else float(n_months_span) * 12.0 / n_months_span)
+        for m_idx in np.unique(month_idx):
+            mask = month_idx == m_idx
+            total = factors[mask].sum()
+            if total <= 0:
+                continue
+            if str(inputtype).strip().lower() == 'year':
+                scale = monthly_f[m_idx] if m_idx < len(monthly_f) else 1.0
+            else:
+                scale = 1.0
+            factors[mask] = factors[mask] / total * scale
 
         return factors

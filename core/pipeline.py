@@ -47,7 +47,7 @@ def run_pipeline(meic_nc_dir, cmaq_grid_file, landuse_file, pop_file, roads_file
                 template_dir, output_dir=None, start_dt=None, end_dt=None,
                 meic_year=None, meic_month=None,
                 sources=['AG', 'IN', 'PP', 'AR', 'TR'],
-                gridcro2d_file=None):
+                gridcro2d_file=None, inputtype='month'):
     from datetime import datetime as _dt, timedelta as _td
     if start_dt is None:
         start_dt = _dt(2020, 1, 1, 0)
@@ -480,7 +480,7 @@ def run_pipeline(meic_nc_dir, cmaq_grid_file, landuse_file, pop_file, roads_file
 
             profile_key = S.SOURCE_PROFILE_KEY.get(src, src)
             temp_factors = temporal.build_temporal_matrix_range(
-                month_start, month_end, profile_key
+                month_start, month_end, profile_key, inputtype=inputtype
             )
 
             h_start = int((month_start - start_dt).total_seconds() / 3600)
@@ -492,7 +492,7 @@ def run_pipeline(meic_nc_dir, cmaq_grid_file, landuse_file, pop_file, roads_file
                 else:
                     hourly_vals = np.zeros(len(cmaq_fids), dtype=np.float32)
                 emissions_3d[h_start:h_start + n_h, :, sp_idx] += (
-                    hourly_vals[np.newaxis, :] * temp_factors[:, np.newaxis]
+                    hourly_vals[np.newaxis, :] * temp_factors[:, np.newaxis] / 3600.0
                 )
 
         out_name = f'{src}area.nc'
