@@ -62,7 +62,8 @@ class TemporalProfile:
         )
 
     def build_temporal_matrix_range(self, start_dt, end_dt, source_key, inputtype='month'):
-        from datetime import timedelta
+        from datetime import datetime, timedelta
+        import calendar
 
         monthly_f = self.get_monthly_factors(source_key)
         weekly_f = self.get_weekly_factors(source_key)
@@ -71,21 +72,28 @@ class TemporalProfile:
         n_hours = int((end_dt - start_dt).total_seconds() / 3600) + 1
         factors = np.zeros(n_hours, dtype=np.float64)
         month_idx = np.zeros(n_hours, dtype=np.int32)
+        year_of_month = {}
 
         for h in range(n_hours):
             cur = start_dt + timedelta(hours=h)
             month_idx[h] = cur.month - 1
+            year_of_month[cur.month - 1] = cur.year
             factors[h] = weekly_f[cur.weekday()] * hourly_f[cur.hour]
 
         for m_idx in np.unique(month_idx):
             mask = month_idx == m_idx
-            total = factors[mask].sum()
-            if total <= 0:
+            month_num = m_idx + 1
+            yr = year_of_month[m_idx]
+            n_days = calendar.monthrange(yr, month_num)[1]
+            full_month_total = sum(
+                weekly_f[datetime(yr, month_num, d).weekday()] for d in range(1, n_days + 1)
+            )
+            if full_month_total <= 0:
                 continue
             if str(inputtype).strip().lower() == 'year':
                 scale = monthly_f[m_idx] if m_idx < len(monthly_f) else 1.0
             else:
                 scale = 1.0
-            factors[mask] = factors[mask] / total * scale
+            factors[mask] = factors[mask] / full_month_total * scale
 
         return factors
